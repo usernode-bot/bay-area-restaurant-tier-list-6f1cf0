@@ -259,8 +259,11 @@ function render() {
   $('demo-line').hidden = !d.demo;
   if (!d.restaurants.length) {
     main.dataset.state = 'empty';
-    main.innerHTML = '';
-    main.appendChild(emptyEl());
+    // The note leads and the four bands follow it, so a new group sees the
+    // shape of the board they are about to fill; with no restaurants, every
+    // band shows its own "Nothing here yet" note.
+    main.innerHTML = boardHTML();
+    main.prepend(emptyEl());
     $('summary').textContent = '';
     $('foot').textContent = '';
     $('nudge').hidden = true;
