@@ -467,7 +467,21 @@ function attachDrag(board) {
       const area = band.querySelector('.tier-chips, .shelf-chips') || band;
       return area.getBoundingClientRect();
     },
-    onLift() { dragging = true; },
+    onLift(item) {
+      dragging = true;
+      // The kit sizes the ghost from the chip's rect while the pointer is
+      // still down, and a pressed button sits under the kit's :active
+      // scale (0.97) -- so the ghost would come out ~3% narrower than the
+      // chip and long names would wrap mid-word. Re-measure from the
+      // chip's layout box, which transforms leave alone, before anything
+      // paints.
+      const ghost = document.querySelector('.un-reorder-ghost');
+      if (ghost) {
+        const cs = getComputedStyle(item);
+        ghost.style.width = cs.width;
+        ghost.style.height = cs.height;
+      }
+    },
     onPlace(item, cell) {
       // Optimistic move; the re-render is held until the release settles.
       pendingRender = true;
