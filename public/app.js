@@ -275,8 +275,9 @@ function render() {
   main.dataset.state = 'ready';
   main.innerHTML = boardHTML();
   // The drag host is the app shell, not the board: shelf chips sit outside
-  // <main>, and a drag has to be liftable from the shelf too.
-  if (state.view === 'mine') attachDrag(main.closest('.app-shell')); else detachDrag();
+  // <main>, and a drag has to be liftable from the shelf too. Group drags
+  // too when signed in; guests can't save a tier, so their board stays tap-only.
+  if (state.view === 'mine' || me()) attachDrag(main.closest('.app-shell')); else detachDrag();
   renderSummary();
   renderNudge();
   renderShelf();
@@ -411,6 +412,7 @@ function renderShelf() {
 function renderFoot() {
   $('foot').textContent = state.view === 'group'
     ? 'Each band is where the group puts a restaurant on average. The small letter is your tier; a dashed one means you haven\'t ranked it.'
+      + (me() ? ' Drag a restaurant onto a band to set your tier, or tap it.' : '')
     : 'These bands hold only your choices. Drag a restaurant onto a band, or tap it to pick a tier.';
 }
 
@@ -426,7 +428,7 @@ function setSegUI() {
   $('seg-mine').setAttribute('aria-pressed', String(state.view === 'mine'));
 }
 
-/* ── Drag a restaurant to a tier (Mine view) ─────────────────────────── */
+/* ── Drag a restaurant to a tier (Mine and, signed in, Group) ────────── */
 
 function clearDropTargets() {
   document.querySelectorAll('.is-drop-target').forEach((n) => n.classList.remove('is-drop-target'));
@@ -470,7 +472,21 @@ function attachDrag(board) {
       const area = band.querySelector('.tier-chips, .shelf-chips') || band;
       return area.getBoundingClientRect();
     },
-    onLift() { dragging = true; },
+    onLift(item) {
+      dragging = true;
+      // The kit sizes the ghost from the chip's rect while the pointer is
+      // still down, and a pressed button sits under the kit's :active
+      // scale (0.97) -- so the ghost would come out ~3% narrower than the
+      // chip and long names would wrap mid-word. Re-measure from the
+      // chip's layout box, which transforms leave alone, before anything
+      // paints.
+      const ghost = document.querySelector('.un-reorder-ghost');
+      if (ghost) {
+        const cs = getComputedStyle(item);
+        ghost.style.width = cs.width;
+        ghost.style.height = cs.height;
+      }
+    },
     onPlace(item, cell) {
       // Optimistic move; the re-render is held until the release settles.
       pendingRender = true;

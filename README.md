@@ -10,7 +10,10 @@ S / A / B / C tiers; the board shows where the group lands on average.
   it yet.
 - **Group / Mine** flips between the group's board and your own. On Mine
   you drag a restaurant onto a band (press and hold on a phone) or tap it
-  and pick a tier; dropping it back on "To rank" clears your choice.
+  and pick a tier; dropping it back on "To rank" clears your choice. On
+  Group, signed in, you can drag too: dropping a restaurant on a band sets
+  your own tier (the group band then re-averages), and dropping it on
+  "Not ranked yet" clears it.
 - **Tap a restaurant** to see its note, who added it, your four tier
   buttons, and how the group splits — who put it where, and how much the
   group agrees.
