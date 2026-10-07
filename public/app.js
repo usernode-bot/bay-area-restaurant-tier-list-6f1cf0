@@ -261,6 +261,11 @@ function render() {
     main.dataset.state = 'empty';
     main.innerHTML = '';
     main.appendChild(emptyEl());
+    // Show the four bands even when the board is empty, so a newcomer sees
+    // what the tier list will look like. appendChild first keeps the Add
+    // button's listener on the already-inserted node.
+    main.insertAdjacentHTML('beforeend', boardHTML());
+    detachDrag();
     $('summary').textContent = '';
     $('foot').textContent = '';
     $('nudge').hidden = true;
