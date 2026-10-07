@@ -2,9 +2,9 @@
 
 A shared tier list for Bay Area restaurants, built with a group of friends
 on Homeroom. Anyone can add a place; everyone ranks each one into their own
-S / A / B / C tiers; the board shows where the group lands on average.
+S / A / B / C / D / F tiers; the board shows where the group lands on average.
 
-- **The board** is what the app opens on: four tier bands, S to C, each
+- **The board** is what the app opens on: six tier bands, S to F, each
   holding the restaurants the group put there on average. A small letter on
   each chip shows where you put it; a dashed one means you haven't ranked
   it yet.
@@ -14,7 +14,7 @@ S / A / B / C tiers; the board shows where the group lands on average.
   Group, signed in, you can drag too: dropping a restaurant on a band sets
   your own tier (the group band then re-averages), and dropping it on
   "Not ranked yet" clears it.
-- **Tap a restaurant** to see its note, who added it, your four tier
+- **Tap a restaurant** to see its note, who added it, your six tier
   buttons, and how the group splits — who put it where, and how much the
   group agrees.
 - **Anyone can add** from the Add button: a name, an optional note, and an

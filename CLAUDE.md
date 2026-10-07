@@ -114,6 +114,7 @@ and updates it when a request changes the look on purpose.
   not read as a tier. Focus ring is blue; danger is the kit default. Tier
   colours are the ones every tier list in the world already uses, as their
   own tokens: tier-s coral red, tier-a orange, tier-b yellow, tier-c green,
+  tier-d teal, tier-f cool grey,
   with ink-dark `--on-tier` letters on them (5:1 or better on every tier
   colour in both looks). Tier colours appear only as tier markers — tiles,
   chip tags, split bars, tier buttons — never as accents.
@@ -157,8 +158,8 @@ Re-theme by changing the token values there, keeping every text pair at
 
 ## App-specific conventions
 
-- **Tiers are fixed at S, A, B, C.** The group-tier rule lives ONLY in
-  `lib/tiers.js` (S counts 4 … C counts 1, group tier is the nearest
+- **Tiers are fixed at S, A, B, C, D, F.** The group-tier rule lives ONLY in
+  `lib/tiers.js` (S counts 6 … F counts 1, group tier is the nearest
   letter to the mean, exact half rounds up) and is unit-tested in
   `test/tiers.test.js`. The client mirrors it in `app.js` only to paint
   the optimistic update; the quiet reload after every write brings the

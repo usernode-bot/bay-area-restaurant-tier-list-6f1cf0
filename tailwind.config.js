@@ -55,12 +55,14 @@ module.exports = {
         danger: token('danger'),
         'on-danger': token('on-danger'),
         focus: token('focus'), // the keyboard focus ring
-        // The tier colours (red, orange, yellow, green — the ones every
-        // tier list already uses) and the ink drawn on them.
+        // The tier colours (red, orange, yellow, green, teal and grey — the
+        // ones every tier list already uses) and the ink drawn on them.
         'tier-s': token('tier-s'),
         'tier-a': token('tier-a'),
         'tier-b': token('tier-b'),
         'tier-c': token('tier-c'),
+        'tier-d': token('tier-d'),
+        'tier-f': token('tier-f'),
         'on-tier': token('on-tier'),
       },
       // Type. `display` is the rounded face used only for tier letters and
