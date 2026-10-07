@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -63,8 +63,9 @@
     try { post('info', ['[dev-console ready]'], { kind: 'ready' }); } catch (_) {}
   })();
   </script>
-  <title>Bay Area Restaurant Tier List</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%237c3aed'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
+  <title>Bay Area tier list</title>
+  <!-- The app mark: a line-drawn noodle bowl in a coral S tile. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='rgb(255,127,127)'/%3E%3Cg fill='none' stroke='rgb(28,22,20)' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M24 48h52a26 26 0 0 1-52 0Z'/%3E%3Cpath d='M40 74h20'/%3E%3Cpath d='M56 24l-8 18'/%3E%3Cpath d='M74 26l-12 16'/%3E%3C/g%3E%3C/svg%3E">
   <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
        in-browser engine plus an inline tailwind.config here). The config
        moved to tailwind.config.js in the repo root; npm run build compiles
@@ -91,6 +92,27 @@
        The bridge is also where the app learns the viewer's light/dark theme:
        the script below reads it. -->
   <script src="/usernode-bridge/v1/bridge.js"></script>
+  <!-- The native-feel UI kit, centrally hosted like the bridge: the bottom
+       sheet / centred modal the restaurants open in, the drag-to-place
+       gesture on Mine, pull-to-refresh, toasts and alert dialogs. -->
+  <link rel="stylesheet" href="/usernode-native/v1/native.css">
+  <script src="/usernode-native/v1/native.js"></script>
+  <!-- Point the kit's variables at this app's tokens: the ink accent, and
+       the sheet / modal surface on the app's own surface colour. -->
+  <style>
+    :root {
+      --un-accent: rgb(var(--accent));
+      --un-accent-contrast: rgb(var(--on-accent));
+      --un-sheet-bg: rgb(var(--surface));
+      --un-popover-bg: rgb(var(--surface));
+    }
+    .dark {
+      --un-accent: rgb(var(--accent));
+      --un-accent-contrast: rgb(var(--on-accent));
+      --un-sheet-bg: rgb(var(--surface));
+      --un-popover-bg: rgb(var(--surface));
+    }
+  </style>
   <!-- Follow the viewer's Homeroom theme (the bridge reports it), with the
        OS preference as the fallback outside Homeroom. -->
   <script>
@@ -107,29 +129,30 @@
     })();
   </script>
 </head>
-<body class="min-h-screen bg-ground text-fg">
-  <!-- Built from the design kit in styles/tailwind-input.css: colour tokens
-       that are right in both looks, and components for buttons, fields,
-       lists, cards and data states. The real app keeps the kit; CLAUDE.md's
-       "## Design" says how. -->
-  <!-- (Named in prose on purpose: Tailwind compiles any class-name word in
-       these files, comments included, and the starter should ship only the
-       components its screen uses.) -->
-  <main class="mx-auto flex max-w-md flex-col gap-8 px-4 py-10">
-
-    <!-- usernode-starter-notice@1 — starter-template messaging. When building
-         the user's real app, replace this whole screen and delete this block,
-         both sentinel comments included. -->
-    <section class="card flex flex-col items-start gap-3">
-      <div class="flex h-20 w-20 items-center justify-center rounded-2xl border border-line bg-ground text-title">🍜</div>
-      <span class="rounded-full bg-raised px-3 py-1 text-small font-medium text-muted">Starter template</span>
-      <h1 class="text-title">Bay Area Restaurant Tier List</h1>
-      <p class="text-body text-muted">Welcome to your new app! Everything on this screen is placeholder content that came with it.</p>
-      <p class="text-body text-muted">To change this app, ask Homeroom bot: tap the <strong class="font-semibold text-fg">Homeroom icon</strong>, then <strong class="font-semibold text-fg">Suggest an improvement</strong>. Describe what you'd like in plain English, and it will be turned into your real app.</p>
+<body class="min-h-screen bg-ground font-sans text-body text-fg">
+  <div class="app-shell">
+    <header class="top">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a9 9 0 0 1-18 0Z"/><path d="M9 20h6"/><path d="M13 3l-2 8"/><path d="M19 4l-5 7"/></svg></span>
+      <h1 class="title">Bay Area tier list</h1>
+      <button type="button" id="add-btn" class="btn-primary" aria-label="Add restaurant"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add</button>
+    </header>
+    <p id="demo-line" class="demo-line" hidden><strong>Staging demo:</strong> made-up restaurants and friends</p>
+    <div class="seg" role="group" aria-label="View">
+      <button type="button" id="seg-group" class="seg-option" aria-pressed="true">Group</button>
+      <button type="button" id="seg-mine" class="seg-option" aria-pressed="false">Mine</button>
+    </div>
+    <p id="summary" class="summary"></p>
+    <div id="nudge" class="nudge" hidden>
+      <p id="nudge-text"></p>
+      <button type="button" id="rank-them" class="btn-secondary">Rank them</button>
+    </div>
+    <main id="board" data-state="loading" class="mt-4"></main>
+    <section id="shelf" class="shelf" hidden>
+      <h2 id="shelf-label" class="section-label">Not ranked yet</h2>
+      <div id="shelf-chips" class="shelf-chips"></div>
     </section>
-    <!-- /usernode-starter-notice@1 -->
-
-    <p class="text-center text-small text-muted">Built on Homeroom. This template screen disappears once you build your real app.</p>
-  </main>
+    <p id="foot" class="foot"></p>
+  </div>
+  <script src="/app.js"></script>
 </body>
 </html>

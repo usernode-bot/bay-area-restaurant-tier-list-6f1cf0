@@ -97,27 +97,47 @@ tables you've marked private), etc.
 
 ## About Bay Area Restaurant Tier List
 
-_(add a sentence or two of product context here so Claude Code has a
-shared understanding of what this app is for)_
+A shared tier list for Bay Area restaurants that a group of friends uses
+together. Anyone in the group can add a place (name plus an optional note);
+everyone ranks each one into their own S / A / B / C tier; the board shows
+where the group lands on average. Visitors without a Homeroom account can
+look at the board; adding and ranking ask them to make an account.
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
-change follows it, and updates it when a request changes the look on purpose.
+This app's look. Set by the first version; every later change follows it,
+and updates it when a request changes the look on purpose.
 
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
-- **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
-  _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+- **Palette:** cool fog greys (a Bay Area morning, not warm stone) for the
+  neutrals; the action colour is **ink** — near-black in light, near-white
+  in dark — because red is the S tier's colour and the primary button must
+  not read as a tier. Focus ring is blue; danger is the kit default. Tier
+  colours are the ones every tier list in the world already uses, as their
+  own tokens: tier-s coral red, tier-a orange, tier-b yellow, tier-c green,
+  with ink-dark `--on-tier` letters on them (5:1 or better on every tier
+  colour in both looks). Tier colours appear only as tier markers — tiles,
+  chip tags, split bars, tier buttons — never as accents.
+- **Signature element:** the tier band — a full-height tile in the tier's
+  colour holding a heavy rounded letter, restaurants beside it like
+  stickers on a board. The same letter-in-a-tile returns at every size:
+  the 22 px your-tier tag on each chip, the 28 px rows of the group split
+  in the sheet, the 56 px tier buttons, and the app mark (a line-drawn
+  noodle bowl in a coral S tile).
+- **Type scale:** `text-title` (1.625rem/2rem, weight 800),
+  `text-heading` (1.125rem/1.5rem, weight 650), `text-body` (1rem/1.5rem),
+  `text-small` (0.875rem/1.25rem). `font-display` (ui-rounded, then SF Pro
+  Rounded, then system-ui) is used ONLY for tier letters and the app
+  title, at weight 800; everything else is `font-sans` (system-ui).
+- **Both looks:** light and dark, following the viewer's Homeroom theme,
+  switching live. No theme picker: the viewer's Homeroom setting is the
+  control.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
 (`btn-primary`, `btn-secondary`, `field`, `list` and `list-row`,
-`card`, `section-label`, `skeleton`, `state-empty`, `state-error`).
+`card`, `section-label`, `skeleton`, `state-empty`, `state-error`) plus
+the board's own (`tier-band`, `tier-tile`, `chip`, `chip-tag`, `seg`,
+`tier-pick`/`pick`, `dist`, `shelf-chips`, `is-drop-target`).
 Re-theme by changing the token values there, keeping every text pair at
 4.5:1 or more in both looks.
 
@@ -126,8 +146,8 @@ Re-theme by changing the token values there, keeping every text pair at
   `text-on-accent`, ...): never a raw hex value or a stock palette class.
 - Tap targets are at least 44 px; the buttons and fields already are.
 - A field's label says what it is; its placeholder, if any, is an example
-  that says so ("e.g. 5.0"), never a bare value that could pass for one
-  already entered.
+  that says so ("e.g. Sunset Pho"), never a bare value that could pass for
+  one already entered.
 - Every screen that loads data has honest loading, empty and error states.
   Never show the empty state while loading or after a failure; an error says
   what failed, what still works, and offers Retry.
@@ -137,6 +157,29 @@ Re-theme by changing the token values there, keeping every text pair at
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- **Tiers are fixed at S, A, B, C.** The group-tier rule lives ONLY in
+  `lib/tiers.js` (S counts 4 … C counts 1, group tier is the nearest
+  letter to the mean, exact half rounds up) and is unit-tested in
+  `test/tiers.test.js`. The client mirrors it in `app.js` only to paint
+  the optimistic update; the quiet reload after every write brings the
+  server's numbers back. Change the rule in `lib/tiers.js`, never in the
+  client.
+- **`is_demo` rows are never shown without staging plus `?demo=1`.** Every
+  API route computes `demo = IS_STAGING && req.query.demo === '1'` and
+  filters on it; a write on a restaurant whose `is_demo` does not match,
+  or that is removed, is a 404. The `demo_viewers` marker is written once
+  per viewer on their first `?demo=1` board request, so what a viewer
+  changes in the demo stays changed.
+- **`reports` is `staging:private`** (as is `demo_viewers`): a report
+  hides a restaurant for the reporter at once and for everyone at two
+  distinct reports. Nobody reviews reports.
+- **Removing a restaurant is a soft delete** (`removed_at`): the unique
+  index `(is_demo, lower(name)) WHERE removed_at IS NULL` frees the name
+  for reuse, and only the adder can edit or remove.
+- **User ids are stored as `String(req.user.id)`** and usernames come from
+  `req.user.username`; read routes work for guests (`req.user ? … : null`),
+  since guests can read every GET.
+- Class names for tier variants are written as whole literals via lookup
+  objects in `public/app.js` (`BAND_CLASS`, `TAG_CLASS`, …), never built by
+  gluing `t-` + tier together — the stylesheet is compiled from literals.
+- No new dependencies without a reason; the app is Express + pg only.

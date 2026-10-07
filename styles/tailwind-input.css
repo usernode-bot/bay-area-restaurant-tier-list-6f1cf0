@@ -29,30 +29,45 @@
  */
 @layer base {
   :root {
-    --ground: 250 250 249;    /* the page */
-    --surface: 255 255 255;   /* lists, cards, fields */
-    --raised: 245 245 244;    /* hovers, badges */
-    --fg: 28 25 23;           /* text */
-    --muted: 87 83 78;        /* secondary text */
-    --line: 231 229 228;      /* borders, dividers, skeletons */
-    --accent: 15 118 110;     /* the one accent */
+    --ground: 244 245 247;    /* the page: cool fog grey, a Bay Area morning */
+    --surface: 255 255 255;   /* bands, cards, fields */
+    --raised: 234 236 240;    /* hovers, badges, the switch track, empty bars */
+    --fg: 22 25 30;           /* text */
+    --muted: 84 90 99;        /* secondary text */
+    --line: 218 222 228;      /* borders, dividers, skeletons */
+    --accent: 22 25 30;       /* the one accent: ink. Red is the S tier's
+                                 colour, so the primary action must not
+                                 read as a tier */
     --on-accent: 255 255 255; /* text on the accent */
     --danger: 185 28 28;
     --on-danger: 255 255 255;
-    --focus: 13 148 136;      /* the keyboard focus ring */
+    --focus: 37 99 235;       /* the keyboard focus ring */
+    /* The tier colours every tier list in the world already uses. Letters
+       on them use --on-tier; that pair is 5:1 or more on every tier
+       colour in both looks. */
+    --tier-s: 255 127 127;    /* coral red */
+    --tier-a: 255 183 110;    /* orange */
+    --tier-b: 255 221 102;    /* yellow */
+    --tier-c: 166 226 120;    /* green */
+    --on-tier: 28 22 20;
   }
   .dark {
-    --ground: 12 10 9;
-    --surface: 28 25 23;
-    --raised: 41 37 36;
-    --fg: 245 245 244;
-    --muted: 168 162 158;
-    --line: 68 64 60;
-    --accent: 45 212 191;
-    --on-accent: 4 47 46;
+    --ground: 17 19 23;
+    --surface: 27 30 35;
+    --raised: 38 42 48;
+    --fg: 240 242 245;
+    --muted: 160 167 176;
+    --line: 56 61 69;
+    --accent: 240 242 245;
+    --on-accent: 22 25 30;
     --danger: 248 113 113;
     --on-danger: 69 10 10;
-    --focus: 94 234 212;
+    --focus: 96 165 250;
+    --tier-s: 232 96 96;
+    --tier-a: 232 150 72;
+    --tier-b: 226 190 64;
+    --tier-c: 130 196 90;
+    --on-tier: 24 18 16;
   }
   /* el.hidden = true hides an element even when a class gives it a display
      (flex, the components below). */
@@ -124,5 +139,256 @@
   .state-empty,
   .state-error {
     @apply flex flex-col items-center gap-2 px-4 py-8 text-center;
+  }
+
+  /* ── The tier board ─────────────────────────────────────────────────────
+     The signature element is the tier band: a full-height tile in the
+     tier's colour holding a heavy rounded letter, restaurants beside it
+     like stickers on a board. The same letter-in-a-tile returns at every
+     size: chip tags (22 px), the group-split rows (28 px), the tier
+     buttons (56 px) and the app mark. */
+
+  /* The page column: centred, up to 640 px on desktop. */
+  .app-shell {
+    @apply mx-auto w-full px-4 pb-8 pt-4;
+    max-width: 40rem;
+  }
+  .top {
+    @apply flex items-center gap-2.5;
+  }
+  .mark {
+    @apply flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-tier-s text-on-tier;
+  }
+  .title {
+    @apply m-0 flex-1 font-display text-title font-extrabold;
+    letter-spacing: -0.01em;
+  }
+  .demo-line {
+    @apply mb-0 mt-2.5 text-small text-muted;
+  }
+  .demo-line strong {
+    @apply font-semibold text-fg;
+  }
+
+  /* Group / Mine switch. */
+  .seg {
+    @apply mt-4 grid grid-cols-2 gap-0 rounded-xl bg-raised;
+    padding: 3px;
+  }
+  .seg-option {
+    @apply min-h-11 rounded-lg border-0 bg-transparent px-3 text-body font-semibold text-muted
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+  }
+  .seg-option[aria-pressed='true'] {
+    @apply bg-surface text-fg;
+    box-shadow: 0 0 0 1px rgb(var(--line));
+  }
+
+  .summary {
+    @apply mx-1 mb-0 mt-4 text-small text-muted;
+  }
+
+  /* The "you haven't ranked them yet" strip (Group view). */
+  .nudge {
+    @apply mb-0 mt-2 flex items-center justify-between gap-3 rounded-xl border border-line
+      bg-surface py-1.5 pl-3.5 pr-1.5;
+  }
+  .nudge p {
+    @apply m-0 text-body;
+  }
+
+  /* A band: tier tile at the left, chips beside it. */
+  .tier-band {
+    @apply grid overflow-hidden rounded-xl border border-line bg-surface;
+    grid-template-columns: 52px 1fr;
+    min-height: 64px;
+  }
+  .tier-tile {
+    @apply flex items-center justify-center bg-tier-s font-display text-title font-extrabold text-on-tier;
+  }
+  .tier-a .tier-tile {
+    @apply bg-tier-a;
+  }
+  .tier-b .tier-tile {
+    @apply bg-tier-b;
+  }
+  .tier-c .tier-tile {
+    @apply bg-tier-c;
+  }
+  .tier-chips {
+    @apply flex flex-wrap content-start items-start gap-2 p-2;
+  }
+  /* Drag hover: the band you would drop onto. */
+  .is-drop-target {
+    box-shadow: inset 0 0 0 2px rgb(var(--fg));
+  }
+
+  /* A restaurant chip: 44 px tall, 10 px radius. On Group it leads with
+     your own tier tag; on Mine the band is already yours, so name only. */
+  .chip {
+    @apply inline-flex min-h-11 items-center gap-2 border border-line bg-ground
+      px-3 pl-2 text-small font-semibold text-fg
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+    border-radius: 10px;
+    overflow-wrap: anywhere;
+  }
+  .chip-tag {
+    @apply inline-flex flex-none items-center justify-center rounded-md
+      bg-tier-s font-display font-extrabold text-on-tier;
+    height: 22px;
+    width: 22px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .chip-tag.t-a {
+    @apply bg-tier-a;
+  }
+  .chip-tag.t-b {
+    @apply bg-tier-b;
+  }
+  .chip-tag.t-c {
+    @apply bg-tier-c;
+  }
+  .chip-tag.is-empty {
+    background: transparent;
+    border: 1.5px dashed rgb(var(--muted));
+  }
+
+  /* The unranked shelf under the board: dashed, a holding area. */
+  .shelf {
+    @apply mt-5;
+  }
+  .shelf-chips {
+    @apply flex flex-wrap content-start items-start gap-2 rounded-xl p-2;
+    border: 1.5px dashed rgb(var(--line));
+  }
+  .shelf-empty,
+  .empty-note {
+    @apply m-0 p-2 text-small text-muted;
+  }
+
+  /* The four big tier buttons in the sheet and the Add form. Unpicked
+     buttons show their tier at a quarter strength; the picked one is
+     filled, ringed in fg. */
+  .tier-pick {
+    @apply mt-1 grid grid-cols-4 gap-2;
+  }
+  .pick {
+    @apply border border-line font-display text-fg
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+    min-height: 56px;
+    border-radius: 10px;
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 800;
+  }
+  .pick.p-s {
+    background: rgb(var(--tier-s) / 0.25);
+  }
+  .pick.p-a {
+    background: rgb(var(--tier-a) / 0.25);
+  }
+  .pick.p-b {
+    background: rgb(var(--tier-b) / 0.25);
+  }
+  .pick.p-c {
+    background: rgb(var(--tier-c) / 0.25);
+  }
+  .pick.p-s[aria-pressed='true'] {
+    @apply border-fg bg-tier-s text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+  .pick.p-a[aria-pressed='true'] {
+    @apply border-fg bg-tier-a text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+  .pick.p-b[aria-pressed='true'] {
+    @apply border-fg bg-tier-b text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+  .pick.p-c[aria-pressed='true'] {
+    @apply border-fg bg-tier-c text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+
+  /* The group split in the sheet: one row per tier, bar sized to its
+     share, names under the bar, count at the right. */
+  .dist {
+    @apply m-0 mt-2 flex list-none flex-col gap-2.5 p-0;
+  }
+  .dist li {
+    @apply grid items-start gap-2.5;
+    grid-template-columns: 28px 1fr 24px;
+  }
+  .dist .chip-tag {
+    height: 28px;
+    width: 28px;
+  }
+  .dist .count {
+    @apply text-right text-small font-semibold text-fg;
+  }
+  .bar {
+    @apply mt-1 h-2 overflow-hidden rounded bg-raised;
+  }
+  .fill {
+    @apply h-2 rounded bg-tier-s;
+  }
+  .fill.t-a {
+    @apply bg-tier-a;
+  }
+  .fill.t-b {
+    @apply bg-tier-b;
+  }
+  .fill.t-c {
+    @apply bg-tier-c;
+  }
+  .who {
+    @apply m-0 mt-1 text-small text-muted;
+  }
+  .verdict {
+    @apply mx-1 mb-0 mt-2 text-body;
+  }
+
+  /* Sheet / modal inner text. */
+  .note {
+    @apply m-0 mt-1 text-body text-muted;
+  }
+  .meta {
+    @apply m-0 mt-1 text-small text-muted;
+  }
+  .label-row {
+    @apply mt-5 flex items-center justify-between gap-2;
+  }
+  .label-row .section-label {
+    @apply mb-0;
+  }
+  .text-btn {
+    @apply inline-flex min-h-11 items-center border-0 bg-transparent px-1 text-small font-medium text-fg
+      underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+  }
+  .quiet {
+    @apply inline-flex min-h-11 items-center gap-1.5 border-0 bg-transparent px-1 text-small font-medium text-muted
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+  }
+  .field-error {
+    @apply m-0 mt-1 text-small text-danger;
+  }
+  .actions {
+    @apply mt-4 flex items-center justify-between gap-2 border-t border-line pt-2;
+  }
+  .sheet-title {
+    @apply m-0 font-sans text-heading font-semibold text-fg;
+  }
+  .foot {
+    @apply mx-1 mb-0 mt-5 text-small text-muted;
+  }
+
+  /* Fallback sheet when the native kit is absent (a plain local run): the
+     same content in a plain <dialog>. */
+  .fallback-sheet {
+    @apply fixed inset-x-0 bottom-0 m-0 w-full max-w-none rounded-t-2xl border-0 bg-surface p-4 pb-6 text-fg;
+  }
+  .fallback-sheet::backdrop {
+    background: rgb(0 0 0 / 0.38);
   }
 }
