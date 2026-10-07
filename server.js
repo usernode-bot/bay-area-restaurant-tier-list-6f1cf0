@@ -2,10 +2,15 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
+const { TIERS, groupTierOf, compareGroup } = require('./lib/tiers');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// An idle pooled connection that the database closed (a database restart,
+// say) emits an error; without this handler the whole app dies on it. pg
+// discards the broken client itself.
+pool.on('error', (err) => console.error('Idle database client error:', err.message));
 
 // The platform signs user-identity tokens with an RSA private key it never
 // shares. Containers get only the PUBLIC half, so this app can verify who a
@@ -145,7 +150,430 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// ── Schema ──────────────────────────────────────────────────────────────
+// Applied idempotently on boot. `restaurants` and `placements` are public
+// (the board's whole point is that the group sees them). `reports` and
+// `demo_viewers` are private: reports hold who reported whom, and
+// demo_viewers marks which account opened a demo preview — neither is
+// board content.
+
+async function migrate() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS restaurants (
+      id serial PRIMARY KEY,
+      name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
+      note text CHECK (note IS NULL OR char_length(note) <= 200),
+      added_by_id text NOT NULL,
+      added_by_name text NOT NULL,
+      is_demo boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      removed_at timestamptz
+    );
+    -- Two places with the same name (case and spacing ignored) are not
+    -- allowed while both are on the list; a removed one frees the name.
+    CREATE UNIQUE INDEX IF NOT EXISTS restaurants_active_name_idx
+      ON restaurants (is_demo, lower(name)) WHERE removed_at IS NULL;
+    CREATE TABLE IF NOT EXISTS placements (
+      restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      user_id text NOT NULL,
+      username text NOT NULL,
+      tier char(1) NOT NULL CHECK (tier IN ('S','A','B','C')),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (restaurant_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS placements_user_idx ON placements (user_id);
+    CREATE TABLE IF NOT EXISTS reports (
+      restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      user_id text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (restaurant_id, user_id)
+    );
+    COMMENT ON TABLE reports IS 'staging:private';
+    CREATE TABLE IF NOT EXISTS demo_viewers (
+      user_id text PRIMARY KEY,
+      seeded_at timestamptz NOT NULL DEFAULT now()
+    );
+    COMMENT ON TABLE demo_viewers IS 'staging:private';
+  `);
+}
+
+// ── Staging demo (first version's ?demo=1 board) ────────────────────────
+// 18 made-up restaurants and five made-up friends who ranked them, plus
+// the viewer's own 13 tiers written once on their first ?demo=1 visit.
+// Everything is `is_demo = true` and the board filters on that, so the
+// plain route never shows or touches any of it. All inserts are
+// ON CONFLICT DO NOTHING with no target, so re-running is safe, and what
+// the viewer changes afterwards stays changed (the demo_viewers marker is
+// written once).
+
+const DEMO_PEOPLE = ['demo-ana', 'demo-ben', 'demo-cleo', 'demo-dev', 'demo-eli'];
+
+// tier order in `tiers` follows DEMO_PEOPLE; null means that friend has
+// not ranked it.
+const DEMO_SEED = [
+  { id: 900001, name: 'Fogline Dumplings',     note: 'Soup dumplings, expect a line',       addedBy: 'demo-ana', tiers: ['S', 'S', 'S', 'A', 'S'] },
+  { id: 900002, name: 'Merritt Ramen Lab',     note: 'Order the black garlic bowl',         addedBy: 'demo-ben', tiers: ['S', 'A', 'S', 'S', null] },
+  { id: 900003, name: 'Telegraph Tacos',       note: 'Al pastor off the spit. Cash only.',  addedBy: 'demo-cleo', tiers: ['S', 'S', 'A', 'S', null] },
+  { id: 900004, name: 'Sunset Pho',            note: 'Huge bowls, rare steak',              addedBy: 'demo-ana', tiers: ['A', 'A', 'S', 'B', 'A'] },
+  { id: 900005, name: 'Clement Dim Sum',       note: 'Go before 11 on weekends',            addedBy: 'demo-ben', tiers: ['A', 'S', 'A', 'A', null] },
+  { id: 900006, name: 'Dolores Dosa',          note: 'Weekends only',                       addedBy: 'demo-cleo', tiers: ['A', 'A', 'B', null, null] },
+  { id: 900007, name: 'Temescal Tteok',        note: null,                                  addedBy: 'demo-dev', tiers: ['S', 'A', 'A', 'B', null] },
+  { id: 900008, name: 'J-Town Katsu',          note: 'Get the curry on the side',           addedBy: 'demo-eli', tiers: ['A', 'A', 'S', null, 'A'] },
+  { id: 900009, name: 'Cable Car Congee',      note: null,                                  addedBy: 'demo-ana', tiers: ['B', 'B', 'A', 'C', null] },
+  { id: 900010, name: 'Bao Stop',              note: 'Good for a quick lunch',              addedBy: 'demo-ben', tiers: ['B', 'A', 'B', null, null] },
+  { id: 900011, name: 'Ocean Beach Burgers',   note: 'Windy patio',                         addedBy: 'demo-cleo', tiers: ['B', 'B', null, null, 'C'] },
+  { id: 900012, name: 'Nopa Noodles',          note: null,                                  addedBy: 'demo-dev', tiers: ['A', 'B', 'B', 'C', 'B'] },
+  { id: 900013, name: 'Valencia Vada Pav',     note: 'Spicy, in a good way',                addedBy: 'demo-eli', tiers: ['B', 'C', null, 'B', null] },
+  { id: 900014, name: 'Sourdough & Sons',      note: null,                                  addedBy: 'demo-ana', tiers: ['C', 'C', 'B', null, null] },
+  { id: 900015, name: 'Half Moon Fish Fry',    note: 'Long drive, small portions',          addedBy: 'demo-ben', tiers: ['C', 'B', 'C', null, null] },
+  { id: 900016, name: 'Crab Counter',          note: null,                                  addedBy: 'demo-dev', tiers: ['C', 'C', null, 'C', 'B'] },
+  { id: 900017, name: 'Bernal Bakery',         note: 'Morning buns sell out early',         addedBy: 'demo-cleo', tiers: [null, null, null, null, null] },
+  { id: 900018, name: 'Fruitvale Pupusas',     note: null,                                  addedBy: 'demo-eli', tiers: [null, null, null, null, null] },
+];
+
+// The viewer's own demo tiers, by restaurant id — 13 of the 18, so the
+// your-tier tags, the Mine view and the "5 yet" strip all have something
+// of the viewer's to show.
+const VIEWER_TIERS = {
+  900001: 'S', 900002: 'S', 900003: 'A', 900004: 'A', 900005: 'A',
+  900006: 'S', 900008: 'B', 900009: 'B', 900010: 'C', 900012: 'B',
+  900013: 'B', 900014: 'C', 900016: 'C',
+};
+
+async function seedDemoBoard() {
+  for (const r of DEMO_SEED) {
+    await pool.query(
+      `INSERT INTO restaurants (id, name, note, added_by_id, added_by_name, is_demo)
+       VALUES ($1, $2, $3, $4, $4, true)
+       ON CONFLICT DO NOTHING`,
+      [r.id, r.name, r.note, r.addedBy]
+    );
+    for (let i = 0; i < DEMO_PEOPLE.length; i++) {
+      if (!r.tiers[i]) continue;
+      await pool.query(
+        `INSERT INTO placements (restaurant_id, user_id, username, tier)
+         VALUES ($1, $2, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [r.id, DEMO_PEOPLE[i], r.tiers[i]]
+      );
+    }
+  }
+  // Keep real rows out of the demo id range for good.
+  await pool.query(`SELECT setval(pg_get_serial_sequence('restaurants', 'id'), 900100, true)`);
+}
+
+async function seedDemoViewer(user) {
+  const marked = await pool.query(
+    `INSERT INTO demo_viewers (user_id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING user_id`,
+    [String(user.id)]
+  );
+  if (marked.rowCount === 0) return; // already seeded once for this viewer
+  for (const [id, tier] of Object.entries(VIEWER_TIERS)) {
+    await pool.query(
+      `INSERT INTO placements (restaurant_id, user_id, username, tier)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [Number(id), String(user.id), user.username, tier]
+    );
+  }
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────
+
+function cleanName(raw) {
+  if (typeof raw !== 'string') return { error: 'Add a name.' };
+  const name = raw.replace(/\s+/g, ' ').trim();
+  if (!name) return { error: 'Add a name.' };
+  if (name.length > 80) return { error: 'Keep the name to 80 characters or fewer.' };
+  return { valid: name };
+}
+
+function cleanNote(raw) {
+  if (raw == null) return { valid: null };
+  if (typeof raw !== 'string') return { error: 'Notes are text.' };
+  const note = raw.trim();
+  if (!note) return { valid: null };
+  if (note.length > 200) return { error: 'Keep the note to 200 characters or fewer.' };
+  return { valid: note };
+}
+
+// One restaurant as the board renders it: placements collected, group tier
+// worked out by the tested rule in lib/tiers.js, and the viewer's own bits
+// (mine, canEdit) filled in for whoever is asking.
+function restaurantShape(row, placements, user) {
+  const viewerId = user ? String(user.id) : null;
+  const group = groupTierOf(placements);
+  const mine = viewerId
+    ? (placements.find((p) => p.userId === viewerId) || {}).tier || null
+    : null;
+  return {
+    id: row.id,
+    name: row.name,
+    note: row.note,
+    addedBy: { id: row.added_by_id, username: row.added_by_name },
+    canEdit: !!(user && row.added_by_id === viewerId),
+    mine,
+    placements,
+    group: { tier: group.tier, mean: group.mean, count: group.count, agree: group.agree },
+  };
+}
+
+// The row and its placements, or null when there is no such restaurant in
+// this mode: wrong is_demo, removed, or no such id at all.
+async function loadRestaurant(id, demo) {
+  const { rows } = await pool.query(
+    `SELECT id, name, note, added_by_id, added_by_name, created_at
+       FROM restaurants
+      WHERE id = $1 AND is_demo = $2 AND removed_at IS NULL`,
+    [id, demo]
+  );
+  if (!rows.length) return null;
+  const placed = await pool.query(
+    `SELECT user_id AS "userId", username, tier, updated_at AS "updatedAt"
+       FROM placements
+      WHERE restaurant_id = $1
+      ORDER BY updated_at`,
+    [id]
+  );
+  return { row: rows[0], placements: placed.rows };
+}
+
+function parseId(raw) {
+  return /^\d+$/.test(String(raw)) ? Number.parseInt(raw, 10) : null;
+}
+
+// ── API ─────────────────────────────────────────────────────────────────
+// `demo` is staging plus ?demo=1, and nothing else: every route filters on
+// is_demo, so a plain visit never shows or touches demo rows. A write on a
+// restaurant from the other mode, or a removed one, is a 404. The auth
+// middleware above has already answered guests' writes with 401
+// account_required, so every route below can read req.user.
+
+app.get('/api/board', async (req, res) => {
+  try {
+    const demo = IS_STAGING && req.query.demo === '1';
+    if (demo && req.user) await seedDemoViewer(req.user);
+    const viewerId = req.user ? String(req.user.id) : null;
+    const { rows } = await pool.query(
+      `SELECT r.id, r.name, r.note, r.added_by_id, r.added_by_name,
+              COALESCE(
+                json_agg(json_build_object(
+                    'userId', p.user_id, 'username', p.username,
+                    'tier', p.tier, 'updatedAt', p.updated_at)
+                  ORDER BY p.updated_at)
+                FILTER (WHERE p.user_id IS NOT NULL),
+                '[]'::json) AS placements
+         FROM restaurants r
+         LEFT JOIN placements p ON p.restaurant_id = r.id
+        WHERE r.is_demo = $1
+          AND r.removed_at IS NULL
+          -- hidden from everyone at two distinct reports
+          AND (SELECT count(*) FROM reports rp WHERE rp.restaurant_id = r.id) < 2
+          -- hidden from the viewer who reported it
+          AND ($2::text IS NULL OR NOT EXISTS (
+                SELECT 1 FROM reports mine
+                 WHERE mine.restaurant_id = r.id AND mine.user_id = $2))
+        GROUP BY r.id`,
+      [demo, viewerId]
+    );
+    const restaurants = rows.map((row) =>
+      restaurantShape(row, row.placements, req.user)
+    );
+    // The board's order: mean descending, rankers descending, then name.
+    restaurants.sort(compareGroup);
+    const rankers = new Set();
+    for (const r of restaurants) for (const p of r.placements) rankers.add(p.userId);
+    res.json({
+      me: req.user ? { id: viewerId, username: req.user.username } : null,
+      demo,
+      restaurants,
+      rankers: rankers.size,
+    });
+  } catch (err) {
+    console.error('GET /api/board failed:', err.message);
+    res.status(500).json({ error: 'Could not load the board.' });
+  }
+});
+
+app.post('/api/restaurants', async (req, res) => {
+  const demo = IS_STAGING && req.query.demo === '1';
+  const name = cleanName(req.body && req.body.name);
+  if (name.error) return res.status(400).json({ error: name.error, field: 'name' });
+  const note = cleanNote(req.body && req.body.note);
+  if (note.error) return res.status(400).json({ error: note.error, field: 'note' });
+  const tier = req.body && req.body.tier != null ? req.body.tier : null;
+  if (tier != null && !TIERS.includes(tier)) {
+    return res.status(400).json({ error: 'Pick a tier: S, A, B or C.', field: 'tier' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const dupe = await client.query(
+      `SELECT id, name FROM restaurants
+        WHERE is_demo = $1 AND removed_at IS NULL AND lower(name) = lower($2)
+        LIMIT 1`,
+      [demo, name.valid]
+    );
+    if (dupe.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'duplicate', id: dupe.rows[0].id, name: dupe.rows[0].name });
+    }
+    const inserted = await client.query(
+      `INSERT INTO restaurants (name, note, added_by_id, added_by_name, is_demo)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, note, added_by_id, added_by_name, created_at`,
+      [name.valid, note.valid, String(req.user.id), req.user.username, demo]
+    );
+    const row = inserted.rows[0];
+    const placements = [];
+    if (tier) {
+      await client.query(
+        `INSERT INTO placements (restaurant_id, user_id, username, tier)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT DO NOTHING`,
+        [row.id, String(req.user.id), req.user.username, tier]
+      );
+      placements.push({
+        userId: String(req.user.id),
+        username: req.user.username,
+        tier,
+        updatedAt: row.created_at,
+      });
+    }
+    await client.query('COMMIT');
+    res.status(201).json(restaurantShape(row, placements, req.user));
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    // Lost the race with a simultaneous add of the same name.
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'duplicate' });
+    }
+    console.error('POST /api/restaurants failed:', err.message);
+    res.status(500).json({ error: 'Could not add the restaurant.' });
+  } finally {
+    client.release();
+  }
+});
+
+app.patch('/api/restaurants/:id', async (req, res) => {
+  try {
+    const demo = IS_STAGING && req.query.demo === '1';
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'not_found' });
+    const found = await loadRestaurant(id, demo);
+    if (!found) return res.status(404).json({ error: 'not_found' });
+    if (found.row.added_by_id !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Only the person who added it can edit it.' });
+    }
+    const name = cleanName(req.body && req.body.name);
+    if (name.error) return res.status(400).json({ error: name.error, field: 'name' });
+    const note = cleanNote(req.body && req.body.note);
+    if (note.error) return res.status(400).json({ error: note.error, field: 'note' });
+    const dupe = await pool.query(
+      `SELECT id, name FROM restaurants
+        WHERE is_demo = $1 AND removed_at IS NULL AND id <> $2 AND lower(name) = lower($3)
+        LIMIT 1`,
+      [demo, id, name.valid]
+    );
+    if (dupe.rows.length) {
+      return res.status(409).json({ error: 'duplicate', id: dupe.rows[0].id, name: dupe.rows[0].name });
+    }
+    const updated = await pool.query(
+      `UPDATE restaurants SET name = $1, note = $2, updated_at = now()
+        WHERE id = $3
+        RETURNING id, name, note, added_by_id, added_by_name, created_at`,
+      [name.valid, note.valid, id]
+    );
+    res.json(restaurantShape(updated.rows[0], found.placements, req.user));
+  } catch (err) {
+    console.error('PATCH /api/restaurants failed:', err.message);
+    res.status(500).json({ error: 'Could not save the changes.' });
+  }
+});
+
+app.delete('/api/restaurants/:id', async (req, res) => {
+  try {
+    const demo = IS_STAGING && req.query.demo === '1';
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'not_found' });
+    const found = await loadRestaurant(id, demo);
+    if (!found) return res.status(404).json({ error: 'not_found' });
+    if (found.row.added_by_id !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Only the person who added it can remove it.' });
+    }
+    // Soft delete: the row stays (so a name clash never resurrects old
+    // data oddly), the unique index frees the name for reuse.
+    await pool.query(
+      `UPDATE restaurants SET removed_at = now(), updated_at = now() WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/restaurants failed:', err.message);
+    res.status(500).json({ error: 'Could not remove it.' });
+  }
+});
+
+app.put('/api/restaurants/:id/placement', async (req, res) => {
+  try {
+    const demo = IS_STAGING && req.query.demo === '1';
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'not_found' });
+    const found = await loadRestaurant(id, demo);
+    if (!found) return res.status(404).json({ error: 'not_found' });
+    const tier = req.body ? req.body.tier : undefined;
+    if (tier !== null && !TIERS.includes(tier)) {
+      return res.status(400).json({ error: 'Pick a tier: S, A, B or C.' });
+    }
+    const userId = String(req.user.id);
+    if (tier === null) {
+      await pool.query(
+        `DELETE FROM placements WHERE restaurant_id = $1 AND user_id = $2`,
+        [id, userId]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO placements (restaurant_id, user_id, username, tier, updated_at)
+         VALUES ($1, $2, $3, $4, now())
+         ON CONFLICT (restaurant_id, user_id)
+         DO UPDATE SET tier = EXCLUDED.tier, username = EXCLUDED.username, updated_at = now()`,
+        [id, userId, req.user.username, tier]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PUT /api/restaurants/:id/placement failed:', err.message);
+    res.status(500).json({ error: 'Could not save your tier.' });
+  }
+});
+
+app.post('/api/restaurants/:id/report', async (req, res) => {
+  try {
+    const demo = IS_STAGING && req.query.demo === '1';
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'not_found' });
+    const found = await loadRestaurant(id, demo);
+    if (!found) return res.status(404).json({ error: 'not_found' });
+    const userId = String(req.user.id);
+    if (found.row.added_by_id === userId) {
+      return res.status(400).json({ error: 'You added this one, so you can remove it instead.' });
+    }
+    await pool.query(
+      `INSERT INTO reports (restaurant_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [id, userId]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error('POST /api/restaurants/:id/report failed:', err.message);
+    res.status(500).json({ error: 'Could not report it.' });
+  }
+});
+
+app.get('/health', (req, res) => {
+  if (shuttingDown) return res.status(503).json({ status: 'shutting-down' });
+  res.json({ status: 'ok' });
+});
 
 // The template ships no favicon file; index.html carries an inline SVG
 // icon instead. Answer 204 here so anything that still probes
@@ -191,8 +619,44 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ── Graceful shutdown ───────────────────────────────────────────────────
+// Stop accepting connections, let in-flight requests finish under a hard
+// deadline, close the pool, exit. Idempotent: a repeat signal during the
+// drain must not run the teardown twice.
+
+const DRAIN_MS = 3000;
+let shuttingDown = false;
+let server = null;
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] ${signal} received, draining`);
+  if (server) {
+    server.close(() => {});
+    if (server.closeIdleConnections) server.closeIdleConnections();
+    const t = setTimeout(() => {
+      if (server.closeAllConnections) server.closeAllConnections();
+    }, DRAIN_MS);
+    if (t.unref) t.unref();
+  }
+  try {
+    await pool.end();
+  } catch (err) {
+    console.error('[shutdown] pool.end failed:', err.message);
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 async function start() {
-  const server = app.listen(port, () => console.log(`Listening on :${port}`));
+  // The migration runs before listen: a request that arrives before the
+  // tables exist is the one failure a fresh container can always hit.
+  await migrate();
+  if (IS_STAGING) await seedDemoBoard();
+  server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;
 }

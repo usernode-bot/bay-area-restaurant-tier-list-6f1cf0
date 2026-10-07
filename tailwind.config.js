@@ -55,13 +55,27 @@ module.exports = {
         danger: token('danger'),
         'on-danger': token('on-danger'),
         focus: token('focus'), // the keyboard focus ring
+        // The tier colours (red, orange, yellow, green — the ones every
+        // tier list already uses) and the ink drawn on them.
+        'tier-s': token('tier-s'),
+        'tier-a': token('tier-a'),
+        'tier-b': token('tier-b'),
+        'tier-c': token('tier-c'),
+        'on-tier': token('on-tier'),
+      },
+      // Type. `display` is the rounded face used only for tier letters and
+      // the app title, weight 800 — it reads like a sticker on a menu
+      // board. `sans` is everything else.
+      fontFamily: {
+        display: ['ui-rounded', '"SF Pro Rounded"', 'system-ui', 'sans-serif'],
+        sans: ['system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
       // The type scale: four sizes, and nothing in between.
       fontSize: {
         small: ['0.875rem', { lineHeight: '1.25rem' }],
         body: ['1rem', { lineHeight: '1.5rem' }],
-        heading: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '600' }],
-        title: ['1.75rem', { lineHeight: '2.25rem', fontWeight: '700' }],
+        heading: ['1.125rem', { lineHeight: '1.5rem', fontWeight: '650' }],
+        title: ['1.625rem', { lineHeight: '2rem', fontWeight: '800' }],
       },
     },
   },

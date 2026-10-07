@@ -2,5 +2,26 @@
   "icon": {
     "emoji": "🍜"
   },
-  "secrets": []
+  "secrets": [],
+  "tests": [
+    {
+      "id": "board.demo",
+      "name": "Tier board with demo data",
+      "path": "/?demo=1",
+      "expectSelector": ".tier-band[data-tier='S'] .chip",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "server.js",
+        "lib/**",
+        "tailwind.config.js"
+      ]
+    },
+    {
+      "name": "Board loads without demo data",
+      "path": "/",
+      "expectSelector": "main[data-state='empty'], main[data-state='ready']"
+    }
+  ]
 }
