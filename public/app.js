@@ -270,8 +270,9 @@ function render() {
   main.dataset.state = 'ready';
   main.innerHTML = boardHTML();
   // The drag host is the app shell, not the board: shelf chips sit outside
-  // <main>, and a drag has to be liftable from the shelf too.
-  if (state.view === 'mine') attachDrag(main.closest('.app-shell')); else detachDrag();
+  // <main>, and a drag has to be liftable from the shelf too. Group drags
+  // too when signed in; guests can't save a tier, so their board stays tap-only.
+  if (state.view === 'mine' || me()) attachDrag(main.closest('.app-shell')); else detachDrag();
   renderSummary();
   renderNudge();
   renderShelf();
@@ -406,6 +407,7 @@ function renderShelf() {
 function renderFoot() {
   $('foot').textContent = state.view === 'group'
     ? 'Each band is where the group puts a restaurant on average. The small letter is your tier; a dashed one means you haven\'t ranked it.'
+      + (me() ? ' Drag a restaurant onto a band to set your tier, or tap it.' : '')
     : 'These bands hold only your choices. Drag a restaurant onto a band, or tap it to pick a tier.';
 }
 
@@ -421,7 +423,7 @@ function setSegUI() {
   $('seg-mine').setAttribute('aria-pressed', String(state.view === 'mine'));
 }
 
-/* ── Drag a restaurant to a tier (Mine view) ─────────────────────────── */
+/* ── Drag a restaurant to a tier (Mine and, signed in, Group) ────────── */
 
 function clearDropTargets() {
   document.querySelectorAll('.is-drop-target').forEach((n) => n.classList.remove('is-drop-target'));
