@@ -643,7 +643,12 @@ function wireTierPick(form, get, set) {
   }));
 }
 
+// Add runs inline, in a panel on the page under the title, so the board
+// stays visible while you type. Edit stays a sheet.
 function openAddForm() {
+  const panel = $('add-panel');
+  const existing = panel.querySelector('form');
+  if (!panel.hidden && existing) { existing.querySelector('#add-name').focus(); return; }
   let picked = null;
   const form = el(`<form class="flex flex-col gap-4" novalidate>
     <h2 class="sheet-title">Add a restaurant</h2>
@@ -662,7 +667,10 @@ function openAddForm() {
       <div class="tier-pick" role="group" aria-label="Your tier">${tierPickHTML(null)}</div>
       <p class="meta mt-1">Optional: rank it as you add it.</p>
     </div>
-    <button type="submit" class="btn-primary js-submit">Add restaurant</button>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary js-cancel">Cancel</button>
+      <button type="submit" class="btn-primary js-submit">Add restaurant</button>
+    </div>
   </form>`);
   wireTierPick(form, () => picked, (t) => (picked = t));
   form.addEventListener('submit', async (e) => {
@@ -695,12 +703,26 @@ function openAddForm() {
       return;
     }
     const added = await res.json();
-    closeSheet();
+    closeAddForm();
     toast(`Added ${added.name}`);
     load();
   });
-  openSheet(form);
+  form.querySelector('.js-cancel').addEventListener('click', closeAddForm);
+  form.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeAddForm(); }
+  });
+  panel.replaceChildren(form);
+  panel.hidden = false;
+  $('add-btn').setAttribute('aria-expanded', 'true');
   form.querySelector('#add-name').focus();
+}
+
+function closeAddForm() {
+  const panel = $('add-panel');
+  panel.hidden = true;
+  panel.replaceChildren();
+  $('add-btn').setAttribute('aria-expanded', 'false');
+  $('add-btn').focus();
 }
 
 function openEditForm(r) {
