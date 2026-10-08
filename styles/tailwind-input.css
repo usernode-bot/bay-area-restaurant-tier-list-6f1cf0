@@ -49,6 +49,8 @@
     --tier-a: 255 183 110;    /* orange */
     --tier-b: 255 221 102;    /* yellow */
     --tier-c: 166 226 120;    /* green */
+    --tier-d: 110 208 214;    /* teal, under C */
+    --tier-f: 176 182 192;    /* cool grey, the bottom tier */
     --on-tier: 28 22 20;
   }
   .dark {
@@ -67,6 +69,8 @@
     --tier-a: 232 150 72;
     --tier-b: 226 190 64;
     --tier-c: 130 196 90;
+    --tier-d: 80 176 184;
+    --tier-f: 140 147 158;
     --on-tier: 24 18 16;
   }
   /* el.hidden = true hides an element even when a class gives it a display
@@ -215,6 +219,12 @@
   .tier-c .tier-tile {
     @apply bg-tier-c;
   }
+  .tier-d .tier-tile {
+    @apply bg-tier-d;
+  }
+  .tier-f .tier-tile {
+    @apply bg-tier-f;
+  }
   .tier-chips {
     @apply flex flex-wrap content-start items-start gap-2 p-2;
   }
@@ -249,6 +259,12 @@
   .chip-tag.t-c {
     @apply bg-tier-c;
   }
+  .chip-tag.t-d {
+    @apply bg-tier-d;
+  }
+  .chip-tag.t-f {
+    @apply bg-tier-f;
+  }
   .chip-tag.is-empty {
     background: transparent;
     border: 1.5px dashed rgb(var(--muted));
@@ -267,11 +283,11 @@
     @apply m-0 p-2 text-small text-muted;
   }
 
-  /* The four big tier buttons in the sheet and the Add form. Unpicked
+  /* The six big tier buttons in the sheet and the Add form. Unpicked
      buttons show their tier at a quarter strength; the picked one is
      filled, ringed in fg. */
   .tier-pick {
-    @apply mt-1 grid grid-cols-4 gap-2;
+    @apply mt-1 grid grid-cols-6 gap-2;
   }
   .pick {
     @apply border border-line font-display text-fg
@@ -294,6 +310,12 @@
   .pick.p-c {
     background: rgb(var(--tier-c) / 0.25);
   }
+  .pick.p-d {
+    background: rgb(var(--tier-d) / 0.25);
+  }
+  .pick.p-f {
+    background: rgb(var(--tier-f) / 0.25);
+  }
   .pick.p-s[aria-pressed='true'] {
     @apply border-fg bg-tier-s text-on-tier;
     box-shadow: inset 0 0 0 1px rgb(var(--fg));
@@ -308,6 +330,14 @@
   }
   .pick.p-c[aria-pressed='true'] {
     @apply border-fg bg-tier-c text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+  .pick.p-d[aria-pressed='true'] {
+    @apply border-fg bg-tier-d text-on-tier;
+    box-shadow: inset 0 0 0 1px rgb(var(--fg));
+  }
+  .pick.p-f[aria-pressed='true'] {
+    @apply border-fg bg-tier-f text-on-tier;
     box-shadow: inset 0 0 0 1px rgb(var(--fg));
   }
 
@@ -341,6 +371,12 @@
   }
   .fill.t-c {
     @apply bg-tier-c;
+  }
+  .fill.t-d {
+    @apply bg-tier-d;
+  }
+  .fill.t-f {
+    @apply bg-tier-f;
   }
   .who {
     @apply m-0 mt-1 text-small text-muted;

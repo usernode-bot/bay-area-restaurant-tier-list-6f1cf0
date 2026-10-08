@@ -17,18 +17,18 @@ function authHeaders() {
   return TOKEN ? { 'x-usernode-token': TOKEN } : {};
 }
 
-const TIERS = ['S', 'A', 'B', 'C'];
+const TIERS = ['S', 'A', 'B', 'C', 'D', 'F'];
 
 // Whole-literal class names only: the stylesheet is compiled from literals
 // found in the source, so a class glued together at runtime would render
 // unstyled. These lookups are the one place the letter variants live.
-const BAND_CLASS = { S: 'tier-band tier-s', A: 'tier-band tier-a', B: 'tier-band tier-b', C: 'tier-band tier-c' };
-const TAG_CLASS = { S: 'chip-tag t-s', A: 'chip-tag t-a', B: 'chip-tag t-b', C: 'chip-tag t-c' };
+const BAND_CLASS = { S: 'tier-band tier-s', A: 'tier-band tier-a', B: 'tier-band tier-b', C: 'tier-band tier-c', D: 'tier-band tier-d', F: 'tier-band tier-f' };
+const TAG_CLASS = { S: 'chip-tag t-s', A: 'chip-tag t-a', B: 'chip-tag t-b', C: 'chip-tag t-c', D: 'chip-tag t-d', F: 'chip-tag t-f' };
 const TAG_EMPTY = 'chip-tag is-empty';
-const FILL_CLASS = { S: 'fill t-s', A: 'fill t-a', B: 'fill t-b', C: 'fill t-c' };
-const PICK_CLASS = { S: 'pick p-s', A: 'pick p-a', B: 'pick p-b', C: 'pick p-c' };
-const ROW_OF = { S: 0, A: 1, B: 2, C: 3, shelf: 4 };
-const TIER_OF_ROW = ['S', 'A', 'B', 'C', null];
+const FILL_CLASS = { S: 'fill t-s', A: 'fill t-a', B: 'fill t-b', C: 'fill t-c', D: 'fill t-d', F: 'fill t-f' };
+const PICK_CLASS = { S: 'pick p-s', A: 'pick p-a', B: 'pick p-b', C: 'pick p-c', D: 'pick p-d', F: 'pick p-f' };
+const ROW_OF = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, shelf: 6 };
+const TIER_OF_ROW = ['S', 'A', 'B', 'C', 'D', 'F', null];
 
 const state = {
   // Remembers the last view on this device.
@@ -149,12 +149,13 @@ function closeSheet() {
 // The group-tier rule, mirrored from lib/tiers.js (which carries the unit
 // tests). Only used to paint the optimistic update for the instant before
 // the quiet reload brings the server's own numbers back.
-const SCORE = { S: 4, A: 3, B: 2, C: 1 };
+const SCORE = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
 function localGroupTier(placements) {
   const list = placements.filter((p) => TIERS.includes(p.tier));
   if (!list.length) return { tier: null, mean: null, count: 0, agree: 0 };
   const mean = list.reduce((sum, p) => sum + SCORE[p.tier], 0) / list.length;
-  const tier = mean >= 3.5 ? 'S' : mean >= 2.5 ? 'A' : mean >= 1.5 ? 'B' : 'C';
+  const tier = mean >= 5.5 ? 'S' : mean >= 4.5 ? 'A' : mean >= 3.5 ? 'B'
+    : mean >= 2.5 ? 'C' : mean >= 1.5 ? 'D' : 'F';
   return { tier, mean, count: list.length, agree: list.filter((p) => p.tier === tier).length };
 }
 
@@ -261,7 +262,7 @@ function render() {
     main.dataset.state = 'empty';
     main.innerHTML = '';
     main.appendChild(emptyEl());
-    // Show the four bands even when the board is empty, so a newcomer sees
+    // Show the six bands even when the board is empty, so a newcomer sees
     // what the tier list will look like. appendChild first keeps the Add
     // button's listener on the already-inserted node.
     main.insertAdjacentHTML('beforeend', boardHTML());
@@ -292,11 +293,11 @@ function hideAround() {
   $('foot').textContent = '';
 }
 
-// Four grey band shapes with grey chip shapes, while the board loads.
+// Six grey band shapes with grey chip shapes, while the board loads.
 function skeletonHTML() {
-  const widths = [[92, 64], [120, 56, 72], [80, 104], [64, 88]];
+  const widths = [[92, 64], [120, 56, 72], [80, 104], [64, 88], [96, 72], [110, 60]];
   let html = '';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < widths.length; i++) {
     const chips = widths[i]
       .map((w) => `<span class="skeleton" style="display:inline-block;width:${w}px;height:44px;border-radius:10px"></span>`)
       .join('');

@@ -178,7 +178,7 @@ async function migrate() {
       restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
       user_id text NOT NULL,
       username text NOT NULL,
-      tier char(1) NOT NULL CHECK (tier IN ('S','A','B','C')),
+      tier char(1) NOT NULL CHECK (tier IN ('S','A','B','C','D','F')),
       updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (restaurant_id, user_id)
     );
@@ -195,12 +195,22 @@ async function migrate() {
       seeded_at timestamptz NOT NULL DEFAULT now()
     );
     COMMENT ON TABLE demo_viewers IS 'staging:private';
+    -- D and F joined the tier list later. Databases created before that
+    -- still carry the old four-letter CHECK, so widen it in place —
+    -- forward-only, nothing dropped or rewritten. Postgres names an inline
+    -- column CHECK placements_tier_check, so the same name covers both
+    -- fresh and old tables. Both statements run in this one multi-statement
+    -- query (one implicit transaction), so there is no window without a
+    -- check; every existing row satisfies the wider one.
+    ALTER TABLE placements DROP CONSTRAINT IF EXISTS placements_tier_check;
+    ALTER TABLE placements ADD CONSTRAINT placements_tier_check
+      CHECK (tier IN ('S','A','B','C','D','F'));
   `);
 }
 
 // ── Staging demo (first version's ?demo=1 board) ────────────────────────
-// 18 made-up restaurants and five made-up friends who ranked them, plus
-// the viewer's own 13 tiers written once on their first ?demo=1 visit.
+// 21 made-up restaurants and five made-up friends who ranked them, plus
+// the viewer's own 15 tiers written once on their first ?demo=1 visit.
 // Everything is `is_demo = true` and the board filters on that, so the
 // plain route never shows or touches any of it. All inserts are
 // ON CONFLICT DO NOTHING with no target, so re-running is safe, and what
@@ -230,15 +240,21 @@ const DEMO_SEED = [
   { id: 900016, name: 'Crab Counter',          note: null,                                  addedBy: 'demo-dev', tiers: ['C', 'C', null, 'C', 'B'] },
   { id: 900017, name: 'Bernal Bakery',         note: 'Morning buns sell out early',         addedBy: 'demo-cleo', tiers: [null, null, null, null, null] },
   { id: 900018, name: 'Fruitvale Pupusas',     note: null,                                  addedBy: 'demo-eli', tiers: [null, null, null, null, null] },
+  // The bottom of the board: the D and F bands need demo rows too, so they
+  // can be seen on the demo board without anybody ranking first.
+  { id: 900019, name: 'Late Night Nachos',     note: 'Soggy by the second bite',            addedBy: 'demo-ana', tiers: ['D', 'D', 'C', 'F', null] },
+  { id: 900020, name: 'Airport Sandwich Kiosk', note: 'Only if your flight is delayed',     addedBy: 'demo-ben', tiers: ['F', 'F', 'D', null, 'F'] },
+  { id: 900021, name: 'Lukewarm Bagel Co',     note: null,                                  addedBy: 'demo-cleo', tiers: ['D', 'C', 'D', null, null] },
 ];
 
-// The viewer's own demo tiers, by restaurant id — 13 of the 18, so the
+// The viewer's own demo tiers, by restaurant id — 15 of the 21, so the
 // your-tier tags, the Mine view and the "5 yet" strip all have something
-// of the viewer's to show.
+// of the viewer's to show. 900019 and 900020 give the viewer a pick in the
+// new D and F bands too; 900021 stays unranked for them.
 const VIEWER_TIERS = {
   900001: 'S', 900002: 'S', 900003: 'A', 900004: 'A', 900005: 'A',
   900006: 'S', 900008: 'B', 900009: 'B', 900010: 'C', 900012: 'B',
-  900013: 'B', 900014: 'C', 900016: 'C',
+  900013: 'B', 900014: 'C', 900016: 'C', 900019: 'F', 900020: 'D',
 };
 
 async function seedDemoBoard() {
@@ -404,7 +420,7 @@ app.post('/api/restaurants', async (req, res) => {
   if (note.error) return res.status(400).json({ error: note.error, field: 'note' });
   const tier = req.body && req.body.tier != null ? req.body.tier : null;
   if (tier != null && !TIERS.includes(tier)) {
-    return res.status(400).json({ error: 'Pick a tier: S, A, B or C.', field: 'tier' });
+    return res.status(400).json({ error: 'Pick a tier: S, A, B, C, D or F.', field: 'tier' });
   }
   const client = await pool.connect();
   try {
@@ -524,7 +540,7 @@ app.put('/api/restaurants/:id/placement', async (req, res) => {
     if (!found) return res.status(404).json({ error: 'not_found' });
     const tier = req.body ? req.body.tier : undefined;
     if (tier !== null && !TIERS.includes(tier)) {
-      return res.status(400).json({ error: 'Pick a tier: S, A, B or C.' });
+      return res.status(400).json({ error: 'Pick a tier: S, A, B, C, D or F.' });
     }
     const userId = String(req.user.id);
     if (tier === null) {
