@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Bay Area Restaurant Tier List mark: cream noodle bowl on a black tile,
+       two chopsticks standing in it like bridge towers, a noodle hung between
+       them like a cable, and three tier bars below (yellow, blue, green). -->
+  <rect width="1024" height="1024" fill="#000000"/>
+  <!-- noodle cable between the chopsticks -->
+  <path d="M372 168 Q512 420 652 168" fill="none" stroke="#FFFEEA" stroke-width="44" stroke-linecap="round"/>
+  <!-- chopsticks (bridge towers) -->
+  <line x1="372" y1="160" x2="372" y2="430" stroke="#FFFEEA" stroke-width="56" stroke-linecap="round"/>
+  <line x1="652" y1="160" x2="652" y2="430" stroke="#FFFEEA" stroke-width="56" stroke-linecap="round"/>
+  <!-- bowl -->
+  <path d="M212 430 H812 A300 180 0 0 1 212 430 Z" fill="#FFFEEA"/>
+  <!-- tier bars, left-aligned like rows on a tier list -->
+  <rect x="212" y="652" width="560" height="64" rx="32" fill="#FFEE6F"/>
+  <rect x="212" y="740" width="400" height="64" rx="32" fill="#3090E1"/>
+  <rect x="212" y="828" width="240" height="64" rx="32" fill="#A9CF97"/>
+</svg>
