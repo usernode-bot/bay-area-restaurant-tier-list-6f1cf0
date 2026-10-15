@@ -134,9 +134,10 @@
     <header class="top">
       <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a9 9 0 0 1-18 0Z"/><path d="M9 20h6"/><path d="M13 3l-2 8"/><path d="M19 4l-5 7"/></svg></span>
       <h1 class="title">Bay Area tier list</h1>
-      <button type="button" id="add-btn" class="btn-primary" aria-label="Add restaurant"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add</button>
+      <button type="button" id="add-btn" class="btn-primary" aria-label="Add restaurant" aria-controls="add-panel" aria-expanded="false"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add</button>
     </header>
     <p id="demo-line" class="demo-line" hidden><strong>Staging demo:</strong> made-up restaurants and friends</p>
+    <section id="add-panel" class="card add-panel" aria-label="Add a restaurant" hidden></section>
     <div class="seg" role="group" aria-label="View">
       <button type="button" id="seg-group" class="seg-option" aria-pressed="true">Group</button>
       <button type="button" id="seg-mine" class="seg-option" aria-pressed="false">Mine</button>
